@@ -22,14 +22,10 @@ class Body:
         pos, vel = self.initial
         self.position = pygame.Vector2(pos[0], pos[1])
 
-        # self.position += self.velocity * dt
-        # self.velocity += self.acceleration * dt
-        # self.acceleration = pygame.Vector2(0, 0)
-
         # Add the current position to the trail
-        scale = 150
-        x = self.position.x * scale + 640
-        y = self.position.y * scale + 360
+        scale = 200
+        x = self.position.x * scale + 275
+        y = self.position.y * scale + 275
         self.scaledPos = pygame.Vector2(x, y)
         self.trail.append(self.scaledPos)
 
@@ -37,10 +33,43 @@ class Body:
         if len(self.trail) > self.max_trail_length:
             self.trail.pop(0)
 
+    def verlet_update(self, dt, bodies):
+        # Compute the initial acceleration based on the current forces
+        initial_acc = self.compute_acceleration(bodies)
+        
+        # Update the position using Velocity Verlet
+        self.position += self.velocity * dt + 0.5 * initial_acc * dt**2
+
+        # Compute the new acceleration after updating the position
+        new_acc = self.compute_acceleration(bodies)
+        
+        # Update the velocity using the average of the current and new acceleration
+        self.velocity += 0.5 * (initial_acc + new_acc) * dt
+
+        # Add the current position to the trail (scaled)
+        scale = 200
+        x = self.position.x * scale + 275
+        y = self.position.y * scale + 275
+        self.scaledPos = pygame.Vector2(x, y)
+        self.trail.append(self.scaledPos)
+
+        # Ensure the trail length doesn't exceed the maximum limit
+        if len(self.trail) > self.max_trail_length:
+            self.trail.pop(0)
+
+    def compute_acceleration(self, bodies):
+        acc = pygame.Vector2(0, 0)
+        for body in bodies:
+            if body == self:
+                continue
+            r = body.position - self.position
+            distance = r.magnitude()
+            acc += body.mass * r / distance**3
+        return acc
+
     def draw(self, screen):
         x = int(self.scaledPos.x)
         y = int(self.scaledPos.y)
-        # pygame.draw.circle(screen, self.color, self.scaledPos, self.radius)
         pygame.gfxdraw.aacircle(screen, x, y, self.radius, self.color)
         pygame.gfxdraw.filled_circle(screen, x, y, self.radius, self.color)
 
@@ -67,13 +96,3 @@ class Body:
         k4 = self.motion(y + k3 * dt, bodies)
 
         return dt * (k1 + 2 * k2 + 2 * k3 + k4) / 6
-
-    def simulate(self, bodies):
-        for body in bodies:
-            if body == self:
-                continue
-            r = body.position - self.position
-            distance = r.magnitude()
-            force = body.mass * r / distance**3
-
-            self.acceleration += force
